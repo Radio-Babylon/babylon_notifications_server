@@ -1,10 +1,10 @@
-package com.babylonradio.babylon_notifications_server;
+package com.babylonradio.notification_batches;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class BabylonNotificationsServerApplicationTests {
+class NotificationBatchesApplicationTests {
 
     @Test
     void contextLoads() {

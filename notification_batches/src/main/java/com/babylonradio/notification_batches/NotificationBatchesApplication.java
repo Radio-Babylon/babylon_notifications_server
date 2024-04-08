@@ -1,13 +1,13 @@
-package com.babylonradio.babylon_notifications_server;
+package com.babylonradio.notification_batches;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class BabylonNotificationsServerApplication {
+public class NotificationBatchesApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(BabylonNotificationsServerApplication.class, args);
+        SpringApplication.run(NotificationBatchesApplication.class, args);
     }
 
 }
