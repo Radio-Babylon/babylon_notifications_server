@@ -1,0 +1,15 @@
+version: '3.3'
+
+services:
+
+  notification_service:
+    container_name: notification_service
+    build:
+      context: ./notification_service
+      dockerfile: Dockerfile
+
+  notification_batches:
+    container_name: notification_batches
+    build:
+        context: ./notification_batches
+        dockerfile: Dockerfile  
