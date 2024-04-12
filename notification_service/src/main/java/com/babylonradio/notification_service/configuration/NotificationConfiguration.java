@@ -2,22 +2,25 @@ package com.babylonradio.notification_service.configuration;
 
 
 import com.babylonradio.notification_service.NotificationServiceApplication;
+import com.babylonradio.notification_service.service.NotificationService;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.CollectionReference;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.cloud.FirestoreClient;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.IOException;
 
-import static com.babylonradio.notification_service.service.NotificationService.sendMessageToFcmRegistrationToken;
-
 @Configuration
 @Slf4j
+@AllArgsConstructor
 public class NotificationConfiguration {
+
+    private final NotificationService notificationService;
     @Bean
     public FirebaseApp initFirebaseApp() throws IOException {
         FirebaseOptions options =
@@ -28,22 +31,16 @@ public class NotificationConfiguration {
     }
 
     @Bean
-    public CollectionReference readNotification(FirebaseApp firebaseApp) {
-        CollectionReference collectionReference = FirestoreClient.getFirestore(firebaseApp.getInstance()).collection("notifications");
+    public CollectionReference readNotifications() {
+        CollectionReference collectionReference = FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("notifications");
         collectionReference.addSnapshotListener((queryDocumentSnapshots, e) -> {
             if (e != null) {
-                log.info(e.getMessage());
+                log.error("Snapshot Listener was not initialized because of:");
+                log.error(e.getMessage());
                 return;
             }
             if (queryDocumentSnapshots != null && !queryDocumentSnapshots.isEmpty()) {
-                queryDocumentSnapshots.getDocuments().forEach(doc -> {
-                    try {
-                        sendMessageToFcmRegistrationToken(doc);
-                        log.info("Message to FCM Registration Token sent successfully !!");
-                    } catch (Exception ex) {
-                        log.error("Message to FCM Registration Token was not sent !!");
-                    }
-                });
+                queryDocumentSnapshots.getDocuments().forEach(doc -> notificationService.sendMessageToCloudMessaging(doc));
             }
         });
         return collectionReference;

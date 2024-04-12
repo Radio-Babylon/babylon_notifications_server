@@ -1,9 +1,10 @@
 package com.babylonradio.notification_service.model;
 
 public enum Type {
-    Friend_Request,
-    Chat_Request,
-    GroupChat_Request,
-    Chat_Message,
-    GroupChat_Message
+    FRIEND_REQUEST,
+    CHAT_REQUEST,
+    GROUPCHAT_REQUEST,
+    CHAT_MESSAGE,
+    GROUPCHAT_MESSAGE,
+    NOT_RECOGNIZED
 }
