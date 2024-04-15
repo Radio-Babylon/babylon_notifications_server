@@ -4,13 +4,14 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Data
 @Getter
 @Setter
-public class Notification {
+public class Subscription {
     private String id;
-    private NotificationType notificationType;
-    private Receiver receiver;
-    private Sender sender;
-    private Metadata metadata;
+    private SubscriptionType subscriptionType;
+    private String topic;
+    private List<Receiver> users;
 }

@@ -2,12 +2,12 @@ package com.babylonradio.notification_service.model;
 
 import lombok.Data;
 
-import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class Metadata {
-    private ArrayList<String> photoURLs;
-    private ArrayList<String> messages;
+    private List<String> picturesURLs;
+    private List<String> messages;
     private String topic;
-    private ArrayList<String> redirectLinks;
+    private List<String> redirectLinks;
 }

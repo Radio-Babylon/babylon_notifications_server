@@ -2,6 +2,7 @@ package com.babylonradio.notification_service.configuration;
 
 
 import com.babylonradio.notification_service.NotificationServiceApplication;
+import com.babylonradio.notification_service.model.SubscriptionType;
 import com.babylonradio.notification_service.service.NotificationService;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.CollectionReference;
@@ -28,6 +29,45 @@ public class NotificationConfiguration {
                         .setCredentials(GoogleCredentials.fromStream(NotificationServiceApplication.class.getClassLoader().getResourceAsStream("service-account.json")))
                         .build();
         return FirebaseApp.initializeApp(options);
+    }
+
+    @Bean
+    public CollectionReference readSubscriptions() {
+        CollectionReference collectionReference = FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("subscriptions");
+        collectionReference.addSnapshotListener((queryDocumentSnapshots, e) -> {
+            if (e != null) {
+                log.error("Snapshot Listener was not initialized because of:");
+                log.error(e.getMessage());
+                return;
+            }
+            if (queryDocumentSnapshots != null && !queryDocumentSnapshots.isEmpty()) {
+                queryDocumentSnapshots.getDocuments().forEach(doc -> {
+                    SubscriptionType subscriptionType = SubscriptionType.valueOf(doc.getData().get("type").toString());
+                    switch (subscriptionType) {
+                        case SUBSCRIPTION -> notificationService.subscribeToTopic(doc);
+                        case UNSUBSCRIPTION -> notificationService.unsubscribeFromTopic(doc);
+                    }
+                });
+            }
+        });
+        return collectionReference;
+    }
+
+    @Bean
+    public CollectionReference sendNotificationsForTopic() {
+        CollectionReference collectionReference = FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("chats");
+        collectionReference.listDocuments().forEach(doc -> doc.addSnapshotListener((documentSnapshot, e) -> {
+                if (e != null) {
+                    log.error("Snapshot Listener was not initialized because of:");
+                    log.error(e.getMessage());
+                    return;
+                }
+                if (documentSnapshot != null && documentSnapshot.exists()) {
+                    notificationService.sendMessageToCloudMessaging(documentSnapshot, documentSnapshot.get("admin") != null);
+                }
+            })
+        );
+        return collectionReference;
     }
 
     @Bean

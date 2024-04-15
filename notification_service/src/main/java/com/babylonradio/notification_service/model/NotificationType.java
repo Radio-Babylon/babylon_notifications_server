@@ -1,0 +1,15 @@
+package com.babylonradio.notification_service.model;
+
+public enum NotificationType {
+    FRIEND_REQUEST_PENDING,
+    CHAT_REQUEST_PENDING,
+    FRIEND_REQUEST_ACCEPTED,
+    CHAT_REQUEST_ACCEPTED,
+    GROUPCHAT_REQUEST_PENDING,
+    GROUPCHAT_REQUEST_ACCEPTED,
+    CHAT_MESSAGE,
+    GROUPCHAT_MESSAGE,
+    AD_OFFER,
+
+    NOT_RECOGNIZED
+}
