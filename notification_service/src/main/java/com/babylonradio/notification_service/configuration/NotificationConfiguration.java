@@ -2,8 +2,11 @@ package com.babylonradio.notification_service.configuration;
 
 
 import com.babylonradio.notification_service.NotificationServiceApplication;
-import com.babylonradio.notification_service.model.SubscriptionType;
+import com.babylonradio.notification_service.publicnotification.model.FCMToken;
+import com.babylonradio.notification_service.publicnotification.utils.TimeUtils;
 import com.babylonradio.notification_service.service.NotificationService;
+import com.babylonradio.notification_service.service.SubscriptionService;
+import com.babylonradio.notification_service.service.UserService;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.CollectionReference;
 import com.google.firebase.FirebaseApp;
@@ -15,6 +18,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+
+import com.babylonradio.notification_service.publicnotification.enums.SubscriptionType;
 
 @Configuration
 @Slf4j
@@ -22,6 +30,9 @@ import java.io.IOException;
 public class NotificationConfiguration {
 
     private final NotificationService notificationService;
+    private final SubscriptionService subscriptionService;
+    private final UserService userService;
+
     @Bean
     public FirebaseApp initFirebaseApp() throws IOException {
         FirebaseOptions options =
@@ -29,6 +40,26 @@ public class NotificationConfiguration {
                         .setCredentials(GoogleCredentials.fromStream(NotificationServiceApplication.class.getClassLoader().getResourceAsStream("service-account.json")))
                         .build();
         return FirebaseApp.initializeApp(options);
+    }
+
+    @Bean
+    public CollectionReference readTokens() {
+        CollectionReference collectionReference = FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("pushedTokens");
+        collectionReference.addSnapshotListener((queryDocumentSnapshots, e) -> {
+            if (e != null) {
+                log.error("Snapshot Listener was not initialized because of:");
+                log.error(e.getMessage());
+                return;
+            }
+            if (queryDocumentSnapshots != null && !queryDocumentSnapshots.isEmpty()) {
+                queryDocumentSnapshots.getDocuments().forEach(doc -> {
+                    OffsetDateTime creationDate = TimeUtils.formatOffsetDateTime(doc.getData().get("creationDate").toString());
+                    OffsetDateTime expirationDate = creationDate.plusDays(270);
+                    userService.registerToken(new FCMToken(doc.getData().get("value").toString(), expirationDate), doc.getId(), doc.getData().get("user").toString());
+                });
+            }
+        });
+        return collectionReference;
     }
 
     @Bean
@@ -44,8 +75,8 @@ public class NotificationConfiguration {
                 queryDocumentSnapshots.getDocuments().forEach(doc -> {
                     SubscriptionType subscriptionType = SubscriptionType.valueOf(doc.getData().get("type").toString());
                     switch (subscriptionType) {
-                        case SUBSCRIPTION -> notificationService.subscribeToTopic(doc);
-                        case UNSUBSCRIPTION -> notificationService.unsubscribeFromTopic(doc);
+                        case SUBSCRIPTION -> subscriptionService.subscribeToTopic(doc);
+                        case UNSUBSCRIPTION -> subscriptionService.unsubscribeFromTopic(doc);
                     }
                 });
             }

@@ -1,11 +1,10 @@
 package com.babylonradio.notification_service.service;
 
 import com.babylonradio.notification_service.mapper.NotificationMapper;
-import com.babylonradio.notification_service.mapper.ReceiverMapper;
-import com.babylonradio.notification_service.model.Receiver;
-import com.babylonradio.notification_service.model.User;
-import com.babylonradio.notification_service.utils.TopicUtils;
+import com.babylonradio.notification_service.publicnotification.utils.TimeUtils;
+import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.cloud.FirestoreClient;
@@ -14,63 +13,23 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
-import static com.babylonradio.notification_service.utils.TopicUtils.mapTopic;
+import static com.babylonradio.notification_service.publicnotification.utils.TopicUtils.mapTopic;
 
 @Service
 @Slf4j
 @AllArgsConstructor
 public class NotificationService {
     private final NotificationMapper notificationMapper;
-    private final ReceiverMapper receiverMapper;
-
-    public void subscribeToTopic(QueryDocumentSnapshot querySnapshot) {
-        log.info("Start Subscription Process ...");
-        List<String> userUID = (List<String>) querySnapshot.getData().get("users");
-        List<Receiver> receivers = userUID.stream().map(receiverMapper::toReceiver).toList();
-        List<String> newSubscribedTokens = receivers.stream().map(Receiver::getFcmToken).toList();
-        String topicName = mapTopic(querySnapshot.getData().get("topic").toString());
-
-        try {
-            TopicManagementResponse response = FirebaseMessaging.getInstance().subscribeToTopic(newSubscribedTokens, topicName);
-            log.info("Numbers of tokens sucessfully subscribed: {}", response.getSuccessCount());
-            log.info("Numbers of tokens unsucessfully subscribed: {}", response.getFailureCount());
-            log.warn("Errors about subscription: {}", response.getErrors());
-            if(response.getErrors().isEmpty()) {
-                popSubscriptionData(String subscriptionId);
-            }
-        } catch (FirebaseMessagingException e) {
-            log.error("Subscription failed because of: ");
-            log.error(e.getMessage());
-        }
-    }
-
-    public void unsubscribeFromTopic(QueryDocumentSnapshot querySnapshot) {
-        log.info("Start Unsubscription Process ...");
-        List<String> userUID = (List<String>) querySnapshot.getData().get("users");
-        List<Receiver> receivers = userUID.stream().map(receiverMapper::toReceiver).toList();
-        List<String> newSubscribedTokens = receivers.stream().map(Receiver::getFcmToken).toList();
-        String topicName = mapTopic(querySnapshot.getData().get("topic").toString());
-
-        try {
-            TopicManagementResponse response = FirebaseMessaging.getInstance().unsubscribeFromTopic(newSubscribedTokens, topicName);
-            log.info("Numbers of tokens sucessfully unsubscribed: {}", response.getSuccessCount());
-            log.info("Numbers of tokens unsucessfully unsubscribed: {}", response.getFailureCount());
-            if(response.getErrors().isEmpty()) {
-                popSubscriptionData(String subscriptionId);
-            }
-        } catch (FirebaseMessagingException e) {
-            log.error("Unsubscription failed because of: ");
-            log.error(e.getMessage());
-        }
-    }
 
     public void sendMessageToCloudMessaging(QueryDocumentSnapshot querySnapshot) {
         log.info("Start Message Generation Process ...");
-        com.babylonradio.notification_service.model.Notification newNotification = notificationMapper.toNotification(querySnapshot);
+        com.babylonradio.notification_service.publicnotification.model.Notification newNotification = notificationMapper.toNotification(querySnapshot);
         try {
             Message message = Message.builder()
 //                .putAllData(metadataMapper.toMap(newNotification.getMetadata()))
@@ -80,7 +39,7 @@ public class NotificationService {
                                 .setImage(newNotification.getMetadata().getPicturesURLs().get(0))
                                 .setBody("Here is your message delivery ! You receive a notification of type " + newNotification.getNotificationType() + " from " + newNotification.getSender().getUsername())
                                 .build())
-                .setToken(newNotification.getReceiver().getFcmToken())
+                .setToken(newNotification.getReceiver().getFcmToken().getValue())
                 .build();
             FirebaseMessaging.getInstance().send(message);
             log.info("Message to FCM Registration Token sent successfully");
@@ -93,8 +52,9 @@ public class NotificationService {
 
     public void sendMessageToCloudMessaging(DocumentSnapshot docSnapshot, boolean isGroupChat) {
         log.info("Start Message Generation Process ...");
-        com.babylonradio.notification_service.model.Notification newNotification = notificationMapper.toNotification(docSnapshot, isGroupChat);
         try {
+            com.babylonradio.notification_service.publicnotification.model.Notification newNotification = notificationMapper.toNotification(docSnapshot, isGroupChat);
+
             Message message = Message.builder()
 //                .putAllData(metadataMapper.toMap(newNotification.getMetadata()))
                     .setNotification(
@@ -105,10 +65,23 @@ public class NotificationService {
                                     .build())
                     .setTopic(mapTopic(newNotification.getMetadata().getTopic()))
                     .build();
-            FirebaseMessaging.getInstance().send(message);
-            log.info("Message to FCM Registration Token sent successfully");
+            switch (newNotification.getNotificationType()) {
+                default -> {
+                    if(!isTheMessageNotified(docSnapshot.getId(), newNotification.getMetadata().getMessages().get(0), newNotification.getMetadata().getLastEventTimestamp())) {
+                        FirebaseMessaging.getInstance().send(message);
+                        log.info("Message to FCM Registration Token sent successfully for topic {}", newNotification.getMetadata().getTopic());
+                        markMessageAsNotified(docSnapshot.getId(), newNotification.getMetadata().getMessages().get(0), newNotification.getMetadata().getLastEventTimestamp());
+                    }
+                    else {
+                        log.warn("Message to FCM Registration Token was not sent successfully for topic {} because it was already emitted", newNotification.getMetadata().getTopic());
+                    }
+                }
+            }
         } catch (FirebaseMessagingException | IllegalArgumentException e) {
             log.error("Message to FCM Registration Token was not sent");
+        } catch (NullPointerException e) {
+            log.error("Message to FCM Registration Token was not sent due to a lack of expected data: ");
+            log.error(e.getMessage());
         }
     }
 
@@ -117,8 +90,37 @@ public class NotificationService {
         FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("notifications").document(notificationId).delete();
     }
 
-    private void popSubscriptionData(String subscriptionId) {
-        log.info("Removing notification {} ...", subscriptionId);
-        FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("notifications").document(subscriptionId).delete();
+    private boolean isTheMessageNotified(String chatId, String messageContent, OffsetDateTime timestamp) {
+        log.info("Looking for a \"notified\" mark ...");
+        Boolean isNotified = false;
+        try {
+            DocumentReference documentReference = FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("chats").document(chatId).collection("messages").orderBy("time", Query.Direction.DESCENDING).limit(1).get().get().getDocuments().get(0).getReference();
+            DocumentSnapshot documentSnapshot = documentReference.get().get();
+            if(documentSnapshot.get("message").toString().equals(messageContent) && TimeUtils.formatOffsetDateTime(documentSnapshot.get("time").toString()).equals(timestamp)) {
+                isNotified = documentSnapshot.get("notified") != null ? (boolean) documentSnapshot.get("notified") : false;
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Message was not marked as notified because of: ");
+            log.error(e.getMessage());
+        }
+        return isNotified;
+    }
+
+    private void markMessageAsNotified(String chatId, String messageContent, OffsetDateTime timestamp) {
+        log.info("Marking message as notified ...");
+        try {
+            DocumentReference documentReference = FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("chats").document(chatId).collection("messages").orderBy("time", Query.Direction.DESCENDING).limit(1).get().get().getDocuments().get(0).getReference();
+            DocumentSnapshot documentSnapshot = documentReference.get().get();
+            if(documentSnapshot.get("message").toString().equals(messageContent) && TimeUtils.formatOffsetDateTime(documentSnapshot.get("time").toString()).equals(timestamp)) {
+                Map<String, Object> newFields = new HashMap<>();
+                newFields.putAll(documentSnapshot.getData());
+                newFields.put("notified", true);
+                documentReference.set(newFields);
+                log.info("Message was marked as notified");
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Message was not marked as notified because of: ");
+            log.error(e.getMessage());
+        }
     }
 }

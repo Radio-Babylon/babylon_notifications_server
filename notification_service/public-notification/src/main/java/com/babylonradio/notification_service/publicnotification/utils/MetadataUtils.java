@@ -1,6 +1,6 @@
-package com.babylonradio.notification_service.utils;
+package com.babylonradio.notification_service.publicnotification.utils;
 
-import com.babylonradio.notification_service.model.Metadata;
+import com.babylonradio.notification_service.publicnotification.model.Metadata;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;

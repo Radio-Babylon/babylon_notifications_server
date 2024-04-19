@@ -1,4 +1,4 @@
-package com.babylonradio.notification_service.model;
+package com.babylonradio.notification_service.publicnotification.model;
 
 import lombok.Data;
 import lombok.Getter;
@@ -8,5 +8,5 @@ import lombok.Setter;
 @Getter
 @Setter
 public class Receiver extends User {
-    private String fcmToken;
+    private FCMToken fcmToken;
 }
