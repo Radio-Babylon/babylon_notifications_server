@@ -4,15 +4,12 @@ import com.babylonradio.notification_batches.NotificationBatchesApplication;
 import com.babylonradio.notification_batches.service.NotificationService;
 import com.babylonradio.notification_batches.service.SubscriptionService;
 import com.babylonradio.notification_batches.service.UserService;
-import com.babylonradio.notification_service.publicnotification.enums.NotificationType;
+import com.babylonradio.notification_service.publicnotification.configuration.NotificationProperties;
 import com.babylonradio.notification_service.publicnotification.model.FCMToken;
 import com.babylonradio.notification_service.publicnotification.model.Notification;
 import com.babylonradio.notification_service.publicnotification.utils.TimeUtils;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.CollectionReference;
-import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
@@ -26,13 +23,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.w3c.dom.ranges.Range;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -46,18 +39,19 @@ public class BatchesConfiguration {
 
     private final UserService userService;
     private final NotificationService notificationService;
-
     private final SubscriptionService subscriptionService;
+    private final NotificationProperties notificationProperties;
+
     @Bean
     public FirebaseApp initFirebaseApp() throws IOException {
         FirebaseOptions options =
                 FirebaseOptions.builder()
-                        .setCredentials(GoogleCredentials.fromStream(NotificationBatchesApplication.class.getClassLoader().getResourceAsStream("service-account.json")))
+                        .setCredentials(GoogleCredentials.fromStream(NotificationBatchesApplication.class.getClassLoader().getResourceAsStream(notificationProperties.getGoogleCredentials())))
                         .build();
         return FirebaseApp.initializeApp(options);
     }
 
-    @Scheduled(timeUnit = TimeUnit.SECONDS, initialDelay = 1, fixedRate = 86400)
+    @Scheduled(timeUnit = TimeUnit.SECONDS, initialDelay = 0, fixedRate = 86400)
     public void purgeExpiredTokens() {
         log.info("Purge Expired Tokens Job is starting ...");
         purgeTokens();
