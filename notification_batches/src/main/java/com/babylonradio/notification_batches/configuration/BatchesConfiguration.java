@@ -116,7 +116,7 @@ public class BatchesConfiguration {
         userCollection.listDocuments().forEach(user -> {
             Integer notificationCounter = userService.hasPendingRequests(user);
             Notification notification = notificationService.buildPendingRequestNotification(notificationCounter, userService.fetchFCMToken(user.getId()));
-            if(notification.getReceiver() != null) {
+            if(notification.getReceiver().getFcmToken() != null) {
                 notificationService.sendMessage(notification);
             }
         });

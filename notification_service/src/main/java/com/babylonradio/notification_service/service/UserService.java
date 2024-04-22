@@ -41,7 +41,7 @@ public class UserService {
             String fcmTokenId = userReference.get().get().getData().get("fcmToken").toString();
             Map<String, Object> fcmTokenData = firestoreClient.collection("fcmTokens").document(fcmTokenId).get().get().getData();
             return new FCMToken(fcmTokenData.get("value").toString(), TimeUtils.formatOffsetDateTime(fcmTokenData.get("expirationDate").toString()));
-        } catch (InterruptedException | ExecutionException | NullPointerException e) {
+        } catch (InterruptedException | ExecutionException | NullPointerException | IllegalArgumentException e) {
             log.error("FCM Token was not fetched because: ");
             log.error(e.getMessage());
             return fcmToken;
@@ -66,7 +66,7 @@ public class UserService {
                 tokenDocument = tokenCollection.document(sameFCMToken.get(0).getId());
             }
             Map<String, Object> userData = userCollection.document(userUID).get().get().getData();
-            userData.replace("fcmToken", tokenDocument.getId());
+            userData.put("fcmToken", tokenDocument.getId());
             userCollection.document(userUID).set(userData);
             log.info("FCMToken for user {} was reset", userUID);
             popPushedTokenData(tokenUID);
