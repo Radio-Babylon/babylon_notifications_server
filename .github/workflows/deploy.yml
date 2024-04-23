@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - master
+      - develop
 
 jobs:
-  run-unit-tests:
-    runs-on:
+  build-services:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -19,24 +20,44 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Maven
-        uses: s4u/setup-maven-action@v3.0.0
+        uses: s4u/setup-maven-action@v1.2.1
         with:
+          java-version: 17
           maven-version: 3.6.3
 
-      - name: Compile Public Library
-        run: mvn clean install -f .\notification_service\public-notification\pom.xml
+      - name: Add Google Credentials to Notification Service
+        id: create-json-service
+        uses: jsdaniell/create-json@v1.2.3
+        with:
+          name: "service-account.json"
+          json: ${{ secrets.SERVICE_ACCOUNT }}
+          dir: './notification_service/src/main/resources'
 
-      - name: Compile And Build Services
-        run: mvn clean package
+      - name: Add Google Credentials to Notification Batches
+        id: create-json-batches
+        uses: jsdaniell/create-json@v1.2.3
+        with:
+          name: "service-account.json"
+          json: ${{ secrets.SERVICE_ACCOUNT }}
+          dir: './notification_batches/src/main/resources'
+
+      - name: Compile Public Library
+        run: mvn clean install -f ./notification_service/public-notification/pom.xml
+
+      - name: Compile And Build Notification Service
+        run: mvn clean install package -f ./notification_service/pom.xml
+
+      - name: Compile And Build Notification Batches
+        run: mvn clean install package -f ./notification_batches/pom.xml
 
       - name: Save Notification Service artifact
         uses: actions/upload-artifact@master
         with:
           name: notification_service
-          path: notification_service.jar
+          path: ./notification_service/target/notification_service.jar
 
       - name: Save Notification Batches artifact
         uses: actions/upload-artifact@master
         with:
           name: notification_batches
-          path: notification_batches.jar
+          path: ./notification_batches/target/notification_batches.jar
