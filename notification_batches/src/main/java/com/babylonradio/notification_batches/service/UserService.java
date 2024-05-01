@@ -30,8 +30,8 @@ public class UserService {
                 List<String> connectionsRequests = (List<String>) userSnapshot.getData().get("connectionRequests");
                 notificationCounter += connectionsRequests.size();
             }
-            if(userSnapshot.getData().get("groupInvitation") != null) {
-                List<String> groupInvitations = (List<String>) userSnapshot.getData().get("groupInvitations");
+            if(userSnapshot.getData().get("groupChatInvitations") != null) {
+                List<String> groupInvitations = (List<String>) userSnapshot.getData().get("groupChatInvitations");
                 notificationCounter += groupInvitations.size();
             }
             if(userSnapshot.getData().get("chatRequests") != null) {
