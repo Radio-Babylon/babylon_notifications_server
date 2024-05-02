@@ -1,9 +1,5 @@
 package com.babylonradio.notification_batches.service;
 
-import com.babylonradio.notification_service.publicnotification.model.FCMToken;
-import com.babylonradio.notification_service.publicnotification.model.Receiver;
-import com.babylonradio.notification_service.publicnotification.model.Subscription;
-import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.TopicManagementResponse;

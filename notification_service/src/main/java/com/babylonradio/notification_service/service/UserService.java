@@ -2,6 +2,7 @@ package com.babylonradio.notification_service.service;
 
 import com.babylonradio.notification_service.publicnotification.model.FCMToken;
 import com.babylonradio.notification_service.publicnotification.utils.TimeUtils;
+import com.babylonradio.notification_service.publicnotification.utils.TopicUtils;
 import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.*;
 import com.google.firebase.FirebaseApp;
@@ -10,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,8 @@ import java.util.concurrent.ExecutionException;
 @Slf4j
 @AllArgsConstructor
 public class UserService {
+
+    private final SubscriptionService subscriptionService;
 
     public String fetchUsername(String userUID) {
         log.info("Fetching Username ...");
@@ -48,6 +52,23 @@ public class UserService {
         }
     }
 
+    public List<String> fetchTopics(String userUID) {
+        log.info("Fetching topics ...");
+        Firestore firestoreClient = FirestoreClient.getFirestore(FirebaseApp.getInstance());
+        List<String> topics = new ArrayList<>();
+        try {
+            List<QueryDocumentSnapshot> chatDocuments = firestoreClient.collection("chats").whereArrayContains("users", userUID).get().get().getDocuments();
+            List<QueryDocumentSnapshot> eventDocuments = firestoreClient.collection("events").whereArrayContains("attendies", userUID).get().get().getDocuments();
+            chatDocuments.forEach(chat -> topics.add(TopicUtils.mapTopic(chat.getData().get("chatName"))));
+            eventDocuments.forEach(event -> topics.add(TopicUtils.mapTopic(event.getData().get("title"))));
+        } catch (InterruptedException | ExecutionException | NullPointerException e) {
+            log.error("Error occured during fetching user topics: ");
+            log.error(e.getMessage());
+            topics.clear();
+        }
+        return topics;
+    }
+
     public void registerToken(FCMToken fcmToken, String tokenUID, String userUID) {
         log.info("Registering FCMToken ...");
         CollectionReference tokenCollection = FirestoreClient.getFirestore(FirebaseApp.getInstance()).collection("fcmTokens");
@@ -69,6 +90,12 @@ public class UserService {
             userData.put("fcmToken", tokenDocument.getId());
             userCollection.document(userUID).set(userData);
             log.info("FCMToken for user {} was reset", userUID);
+            FCMToken tokenToUnregister = fetchFCMToken(userUID);
+            List<String> topics = fetchTopics(userUID);
+            if(tokenToUnregister != null) {
+                subscriptionService.unsubscribeFromTopic(topics, tokenToUnregister.getValue());
+            }
+            subscriptionService.subscribeFromTopic(topics, fcmToken.getValue());
             popPushedTokenData(tokenUID);
         } catch (InterruptedException | ExecutionException | NullPointerException e) {
             log.error("FCM Token was not registered because: ");
